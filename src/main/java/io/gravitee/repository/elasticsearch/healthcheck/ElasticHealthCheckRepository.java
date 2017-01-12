@@ -26,6 +26,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.histogram.ExtendedBounds;
 import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.joda.time.DateTime;
@@ -69,7 +70,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
             // Calculate aggregation
             AggregationBuilder byDateAggregation = dateHistogram("by_date")
-                    .extendedBounds(from, to)
+                    .extendedBounds(new ExtendedBounds(from, to))
                     .field(FIELD_TIMESTAMP)
                     .interval(interval);
 

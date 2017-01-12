@@ -32,7 +32,7 @@
 	<name>Gravitee.io APIM - Repository - Elasticsearch</name>
 
 	<properties>
-		<es.version>2.4.1</es.version>
+		<es.version>5.1.1</es.version>
 		<gravitee-repository.version>1.4.0</gravitee-repository.version>
 	</properties>
 
@@ -49,6 +49,18 @@
 			<groupId>org.elasticsearch</groupId>
 			<artifactId>elasticsearch</artifactId>
 			<version>${es.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.elasticsearch.client</groupId>
+			<artifactId>transport</artifactId>
+			<version>${es.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-to-slf4j</artifactId>
+			<version>2.7</version>
 		</dependency>
 
 		<!-- Spring dependencies -->
@@ -75,6 +87,17 @@
 		</dependency>
 
 		<!-- Unit Tests -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>

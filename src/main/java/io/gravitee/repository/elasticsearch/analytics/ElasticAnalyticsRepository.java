@@ -34,13 +34,13 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.aggregations.*;
 import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.search.aggregations.bucket.histogram.ExtendedBounds;
 import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.range.Range;
-import org.elasticsearch.search.aggregations.bucket.range.RangeBuilder;
-import org.elasticsearch.search.aggregations.bucket.terms.InternalTerms;
-import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
+import org.elasticsearch.search.aggregations.bucket.range.RangeAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.terms.*;
 import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
+import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,9 +49,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
+import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 
 /**
@@ -105,7 +103,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
 
         // Calculate aggregation
         AggregationBuilder byDateAggregation = dateHistogram("by_date")
-                .extendedBounds(histogramQuery.timeRange().range().from(), histogramQuery.timeRange().range().to())
+                .extendedBounds(new ExtendedBounds(histogramQuery.timeRange().range().from(), histogramQuery.timeRange().range().to()))
                 .field(FIELD_TIMESTAMP)
                 .interval(histogramQuery.timeRange().interval().toMillis())
                 .minDocCount(0);
@@ -130,7 +128,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
         SearchRequestBuilder requestBuilder = init(groupByQuery);
 
         if (! groupByQuery.groups().isEmpty()) {
-            RangeBuilder groupByRangeAggregation = range("by_" + groupByQuery.field() + "_range")
+            RangeAggregationBuilder groupByRangeAggregation = range("by_" + groupByQuery.field() + "_range")
                     .field(groupByQuery.field());
 
             // Add ranges
@@ -141,7 +139,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
 
         } else {
             // Define aggregation
-            TermsBuilder topHitsAggregation =
+            TermsAggregationBuilder topHitsAggregation =
                     terms("by_" + groupByQuery.field())
                             .field(groupByQuery.field())
                             .size(20); // Size must be set from the groupByQuery
@@ -217,8 +215,31 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                         Map<String, List<Data>> bucketData = fieldBucket.data();
                         List<Data> data;
 
-                        if (subAggregation instanceof InternalAggregation)
-                            switch (((InternalAggregation) subAggregation).type().name()) {
+                        if (subAggregation instanceof InternalMappedTerms) {
+                            InternalMappedTerms terms = (InternalMappedTerms) subAggregation;
+                            for (Terms.Bucket subTermsBucket : (List<Terms.Bucket>) terms.getBuckets()) {
+                                data = bucketData.get(subTermsBucket.getKeyAsString());
+                                if (data == null) {
+                                    data = new ArrayList<>();
+                                    bucketData.put(subTermsBucket.getKeyAsString(), data);
+                                }
+                                data.add(new Data(keyAsDate, subTermsBucket.getDocCount()));
+                            }
+                        } else if (subAggregation instanceof InternalNumericMetricsAggregation.SingleValue) {
+                            InternalNumericMetricsAggregation.SingleValue singleValue = (InternalNumericMetricsAggregation.SingleValue) subAggregation;
+                            if (Double.isFinite(singleValue.value())) {
+                                data = bucketData.get(singleValue.getName());
+                                if (data == null) {
+                                    data = new ArrayList<>();
+                                    bucketData.put(singleValue.getName(), data);
+                                }
+                                data.add(new Data(keyAsDate, (long) singleValue.value()));
+                            }
+                        }
+                        /*
+                            //TODO: check
+                            //switch (((InternalAggregation) subAggregation).getType().getName()) {
+                            switch (((InternalAggregation) subAggregation).getName()) {
                                 case "terms":
                                     for (Terms.Bucket subTermsBucket : ((Terms) subAggregation).getBuckets()) {
                                         data = bucketData.get(subTermsBucket.getKeyAsString());
@@ -245,6 +266,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                                 default:
                                     // nothing to do
                             }
+                            */
                     }
                 }
             }
